@@ -17,30 +17,28 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 def fetch_and_sync_jobs():
-    rapidapi_key = os.environ.get("RAPIDAPI_KEY")
-    if not rapidapi_key:
-        raise ValueError("RAPIDAPI_KEY environment variable is missing.")
+    url = "https://www.arbeitnow.com/api/job-board-api"
 
-    url = "https://jsearch.p.rapidapi.com/search"
-    querystring = {"query": "Embedded Systems Engineer", "page": "1", "num_pages": "1"}
-    headers = {
-        "x-rapidapi-key": rapidapi_key,
-        "x-rapidapi-host": "jsearch.p.rapidapi.com"
-    }
-
-    print("Fetching jobs from RapidAPI...")
-    response = requests.get(url, headers=headers, params=querystring)
+    print("Fetching jobs from Arbeitnow API...")
+    response = requests.get(url)
     
     if response.status_code != 200:
         raise Exception(f"API request failed with status code {response.status_code}: {response.text}")
 
     data = response.json()
     jobs = data.get("data", [])
-    print(f"Fetched {len(jobs)} jobs. Syncing to Firestore...")
+    
+    keywords = ["embedded", "firmware", "systems", "hardware"]
+    filtered_jobs = [
+        j for j in jobs 
+        if any(kw in j.get("title", "").lower() or kw in j.get("description", "").lower() for kw in keywords)
+    ]
+    
+    print(f"Filtered {len(filtered_jobs)} relevant jobs out of {len(jobs)} total. Syncing to Firestore...")
 
     batch = db.batch()
-    for job in jobs:
-        job_id = job.get("job_id")
+    for job in filtered_jobs:
+        job_id = job.get("slug")
         if job_id:
             doc_ref = db.collection("jobs").document(job_id)
             batch.set(doc_ref, job, merge=True)
