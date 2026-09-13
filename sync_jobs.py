@@ -23,7 +23,6 @@ def fetch_and_sync_jobs():
     if not app_id or not app_key:
         raise ValueError("Adzuna App ID or App Key environment variables are missing.")
 
-    # Adzuna India endpoint targeting Bengaluru
     url = "https://api.adzuna.com/v1/api/jobs/in/search/1"
     
     params = {
@@ -43,7 +42,6 @@ def fetch_and_sync_jobs():
     data = response.json()
     jobs = data.get("results", [])
     
-    # Strict filter for Embedded domain keywords to ensure high relevance
     embedded_keywords = ["embedded", "firmware", "microcontroller", "stm32", "rtos", "hardware", "arm cortex", "iot"]
     filtered_jobs = []
     
@@ -51,7 +49,9 @@ def fetch_and_sync_jobs():
         title = job.get("title", "").lower()
         description = job.get("description", "").lower()
         if any(kw in title or kw in description for kw in embedded_keywords):
-            filtered_jobs.append(job)
+            # Remove any reserved fields like '__class__' or keys starting with double underscores
+            cleaned_job = {k: v for k, v in job.items() if not k.startswith("__")}
+            filtered_jobs.append(cleaned_job)
 
     print(f"Filtered {len(filtered_jobs)} relevant embedded jobs out of {len(jobs)} total fetched. Syncing to Firestore...")
 
