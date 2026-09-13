@@ -21,6 +21,7 @@ def fetch_and_sync_jobs():
     if not rapidapi_key:
         raise ValueError("RAPIDAPI_KEY environment variable is missing.")
 
+    # Check your RapidAPI dashboard playground code snippet for the exact endpoint URL path
     url = "https://jsearch.p.rapidapi.com/search"
     querystring = {"query": "Embedded Systems Engineer", "page": "1", "num_pages": "1"}
     headers = {
