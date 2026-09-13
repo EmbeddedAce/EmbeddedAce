@@ -16,6 +16,15 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
+def clean_dict(d):
+    """Recursively remove any keys that start with double underscores to satisfy Firestore rules."""
+    if isinstance(d, dict):
+        return {k: clean_dict(v) for k, v in d.items() if not k.startswith("__")}
+    elif isinstance(d, list):
+        return [clean_dict(v) for v in d]
+    else:
+        return d
+
 def fetch_and_sync_jobs():
     app_id = os.environ.get("ADZUNA_APP_ID")
     app_key = os.environ.get("ADZUNA_APP_KEY")
@@ -49,8 +58,8 @@ def fetch_and_sync_jobs():
         title = job.get("title", "").lower()
         description = job.get("description", "").lower()
         if any(kw in title or kw in description for kw in embedded_keywords):
-            # Remove any reserved fields like '__class__' or keys starting with double underscores
-            cleaned_job = {k: v for k, v in job.items() if not k.startswith("__")}
+            # Recursively strip any nested keys starting with '__' (like '__class__')
+            cleaned_job = clean_dict(job)
             filtered_jobs.append(cleaned_job)
 
     print(f"Filtered {len(filtered_jobs)} relevant embedded jobs out of {len(jobs)} total fetched. Syncing to Firestore...")
