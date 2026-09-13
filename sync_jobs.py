@@ -21,7 +21,7 @@ def fetch_and_sync_jobs():
     if not rapidapi_key:
         raise ValueError("RAPIDAPI_KEY environment variable is missing.")
 
-    url = "https://jsearch.p.rapidapi.com/search"
+    url = "https://jsearch.p.rapidapi.com/"
     querystring = {"query": "Embedded Systems Engineer", "page": "1", "num_pages": "1"}
     headers = {
         "x-rapidapi-key": rapidapi_key,
