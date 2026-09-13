@@ -1,0 +1,56 @@
+import os
+import requests
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+# Initialize Firebase using the service account JSON stored in GitHub Secrets
+service_account_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
+if not service_account_json:
+    raise ValueError("FIREBASE_SERVICE_ACCOUNT environment variable is missing.")
+
+# If stored as a raw JSON string, write it to a temporary file or initialize directly
+import json
+cred_dict = json.loads(service_account_json)
+cred = credentials.Certificate(cred_dict)
+
+if not firebase_admin._apps:
+    firebase_admin.initialize_app(cred)
+
+db = firestore.client()
+
+def fetch_and_sync_jobs():
+    rapidapi_key = os.environ.get("RAPIDAPI_KEY")
+    if not rapidapi_key:
+        raise ValueError("RAPIDAPI_KEY environment variable is missing.")
+
+    # TODO: Update with your specific RapidAPI endpoint and headers for job data
+    url = "https://jsearch.p.rapidapi.com/search"
+    querystring = {"query": "Embedded Systems Engineer", "page": "1", "num_pages": "1"}
+    headers = {
+        "x-rapidapi-key": rapidapi_key,
+        "x-rapidapi-host": "jsearch.p.rapidapi.com"
+    }
+
+    print("Fetching jobs from RapidAPI...")
+    response = requests.get(url, headers=headers, params=querystring)
+    
+    if response.status_code != 200:
+        raise Exception(f"API request failed with status code {response.status_code}: {response.text}")
+
+    data = response.json()
+    jobs = data.get("data", [])
+    print(f"Fetched {len(jobs)} jobs. Syncing to Firestore...")
+
+    # Sync each job into Firebase Firestore collection 'jobs'
+    batch = db.batch()
+    for job in jobs:
+        job_id = job.get("job_id")
+        if job_id:
+            doc_ref = db.collection("jobs").document(job_id)
+            batch.set(doc_ref, job, merge=True)
+
+    batch.commit()
+    print("Successfully synced jobs to Firebase Firestore!")
+
+if __name__ == "__main__":
+    fetch_and_sync_jobs()
