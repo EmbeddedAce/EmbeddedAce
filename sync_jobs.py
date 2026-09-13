@@ -17,34 +17,53 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 def fetch_and_sync_jobs():
-    url = "https://www.arbeitnow.com/api/job-board-api"
+    app_id = os.environ.get("ADZUNA_APP_ID")
+    app_key = os.environ.get("ADZUNA_APP_KEY")
+    
+    if not app_id or not app_key:
+        raise ValueError("Adzuna App ID or App Key environment variables are missing.")
 
-    print("Fetching jobs from Arbeitnow API...")
-    response = requests.get(url)
+    # Adzuna India endpoint targeting Bengaluru
+    url = "https://api.adzuna.com/v1/api/jobs/in/search/1"
+    
+    params = {
+        "app_id": app_id,
+        "app_key": app_key,
+        "what": "Embedded Systems Engineer OR Firmware",
+        "where": "Bengaluru",
+        "content-type": "application/json"
+    }
+
+    print("Fetching jobs from Adzuna API for India/Bengaluru (Embedded Domain)...")
+    response = requests.get(url, params=params)
     
     if response.status_code != 200:
         raise Exception(f"API request failed with status code {response.status_code}: {response.text}")
 
     data = response.json()
-    jobs = data.get("data", [])
+    jobs = data.get("results", [])
     
-    keywords = ["embedded", "firmware", "systems", "hardware"]
-    filtered_jobs = [
-        j for j in jobs 
-        if any(kw in j.get("title", "").lower() or kw in j.get("description", "").lower() for kw in keywords)
-    ]
+    # Strict filter for Embedded domain keywords to ensure high relevance
+    embedded_keywords = ["embedded", "firmware", "microcontroller", "stm32", "rtos", "hardware", "arm cortex", "iot"]
+    filtered_jobs = []
     
-    print(f"Filtered {len(filtered_jobs)} relevant jobs out of {len(jobs)} total. Syncing to Firestore...")
+    for job in jobs:
+        title = job.get("title", "").lower()
+        description = job.get("description", "").lower()
+        if any(kw in title or kw in description for kw in embedded_keywords):
+            filtered_jobs.append(job)
+
+    print(f"Filtered {len(filtered_jobs)} relevant embedded jobs out of {len(jobs)} total fetched. Syncing to Firestore...")
 
     batch = db.batch()
     for job in filtered_jobs:
-        job_id = job.get("slug")
+        job_id = str(job.get("id"))
         if job_id:
             doc_ref = db.collection("jobs").document(job_id)
             batch.set(doc_ref, job, merge=True)
 
     batch.commit()
-    print("Successfully synced jobs to Firebase Firestore!")
+    print("Successfully synced embedded jobs to Firebase Firestore!")
 
 if __name__ == "__main__":
     fetch_and_sync_jobs()
